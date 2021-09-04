@@ -53,13 +53,13 @@ class Meta_Model(nn.Module):
             self.column2lookup_embedding_layer[col] = lookup_embedding_layer
         self.title_lookup_embedding_layer = nn.Embedding(20001, emb_size)#.to(device)
         self.genres_lookup_embedding_layer = nn.Embedding(21, emb_size)#.to(device)
-
+ 
         # layer
-        self.emb_pred_Dense = nn.Parameter(torch.rand((len(item_col)+ 2)*emb_size,emb_size), requires_grad=True).type(torch.FloatTensor)
-        self.register_parameter('emb_predictor' , self.emb_pred_Dense)
-        print('emb_size : ',emb_size)
-        print('item_col len : ',len(self.columns))
-        feature_num = 2 + len(self.columns)
+        # self.emb_pred_Dense = nn.Parameter(torch.rand((len(item_col)+ 2)*emb_size,emb_size), requires_grad=True).type(torch.FloatTensor)
+        # self.register_parameter('emb_predictor' , self.emb_pred_Dense)
+        self.emb_pred_Dense = nn.Linear((len(item_col)+ 2)*emb_size, emb_size)
+ 
+        feature_num = len(self.columns) + 2
         #self.deep0_dense_layer = nn.Parameter(torch.rand(feature_num*emb_size,feature_num*emb_size), requires_grad=True).type(torch.FloatTensor)
         #self.register_parameter('deep-0' , self.deep0_dense_layer)        
         #self.deep1_dense_layer = nn.Parameter(torch.rand(feature_num*emb_size,feature_num*emb_size), requires_grad=True).type(torch.FloatTensor)
@@ -71,7 +71,7 @@ class Meta_Model(nn.Module):
         #self.out_dense_layer = nn.Parameter(torch.rand((feature_num*emb_size)+len(self.columns),1), requires_grad=True).type(torch.FloatTensor)
         #self.register_parameter('out' , self.out_dense_layer)   
         
-        self.out_dense_layer = nn.Linear((feature_num*emb_size)+len(self.columns), 1)
+        self.out_dense_layer = nn.Linear((feature_num*emb_size)+feature_num, 1)
 
         # activation layer
         self.relu_layer = nn.ReLU()
@@ -82,10 +82,10 @@ class Meta_Model(nn.Module):
         embeddings = [ID_emb] + item_embs + other_embs
         embeddings_cat = torch.cat([emb.view(-1,1,self.emb_size) for emb in embeddings], 1) #torch.Size([200, 8, 128])
         #print('embeddings_cat : ',embeddings_cat.shape)
-        sum_of_emb = torch.sum(embeddings_cat, 1) #torch.Size([200, 128])
+        sum_of_emb = torch.mean(embeddings_cat, 1) #torch.Size([200, 128])
         #print('sum_of_emb : ',sum_of_emb.shape)
         diff_of_emb = [sum_of_emb - x for x in embeddings]
-        dot_of_emb = [torch.sum(embeddings[i]*diff_of_emb[i], axis=1).view(-1,1) for i in range(len(self.columns))]
+        dot_of_emb = [torch.sum(embeddings[i]*diff_of_emb[i], axis=1).view(-1,1) for i in range(len(embeddings))]
         h = torch.cat(dot_of_emb, 1)  #torch.Size([200, 6])
         h2 = torch.cat(embeddings, 1) #torch.Size([200, 1024])
         h2 = self.relu_layer(self.deep0_dense_layer(h2)) #torch.Size([1024, 1024]) | torch.Size([200, 1024])
@@ -94,7 +94,7 @@ class Meta_Model(nn.Module):
         #y_hat = self.sigmoid_layer(h.mm(self.out_dense_layer)) #torch.Size([1030, 1]) | torch.Size([200, 1])
         y_hat = self.sigmoid_layer(self.out_dense_layer(h)) #torch.Size([1030, 1]) | torch.Size([200, 1])
         return y_hat
-
+ 
 
     def get_yhat_PNN(self):
         y_hat = None
@@ -131,7 +131,8 @@ class Meta_Model(nn.Module):
         """
         embs = torch.stack(item_embs, 1)
         item_h = torch.flatten(embs,1)
-        emb_pred = item_h.mm(self.emb_pred_Dense) / 5.
+        #emb_pred = item_h.mm(self.emb_pred_Dense) / 5.
+        emb_pred = self.emb_pred_Dense(item_h) / 5.
         return emb_pred
 
 
@@ -155,7 +156,7 @@ class Meta_Model(nn.Module):
                 # Meta-Embedding: step 2, apply gradient descent once
                 #     get the adapted embedding
                 #cold_emb_grads = tf.gradients(cold_loss_a, meta_ID_emb)[0]
-                cold_emb_grads = torch.autograd.grad(cold_loss_a, meta_ID_emb)[0]
+                cold_emb_grads = torch.autograd.grad(cold_loss_a, meta_ID_emb,retain_graph=True)[0]
                 meta_ID_emb_new = meta_ID_emb - self.cold_lr * cold_emb_grads
                 # Meta-Embedding: step 3, 
                 #     use the adapted embedding to make prediction on another mini-batch 

@@ -31,31 +31,32 @@ class Modeling:
 
         # loss function setting
         self.log_loss = nn.BCELoss()
+        #self.log_loss = nn.BCEWithLogitsLoss()
         # opt func setting
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.warm_lr)
 
-
+ 
     def pre_train_base_model(self, train_x, train_g, train_y, train_t, test_y_test):
         """
         Pre-train the base model
         """
         n_samples = train_x.shape[0]
         n_batch = n_samples//self.batchsize
-
-        for i_batch in tqdm(range(n_batch)):
-            batch_x = train_x.iloc[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
-            batch_t = train_t[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
-            batch_g = train_g[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
-            batch_y = train_y.iloc[i_batch*self.batchsize:(i_batch+1)*self.batchsize].values
-            y_hat = self.model(batch_x, batch_t, batch_g, meta_ID_emb=None ,warm_or_cold='warm')
-            # calculate loss 
-            batch_y_tensor = torch.tensor(batch_y).view(-1,1).type(torch.FloatTensor)
-            batch_loss = self.log_loss(y_hat, batch_y_tensor)
-            # opt loss
-            self.optimizer.zero_grad()
-            batch_loss.backward()
-            self.optimizer.step()
-        # test eval
+        for _ in range(1):
+            for i_batch in tqdm(range(n_batch)):
+                batch_x = train_x.iloc[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
+                batch_t = train_t[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
+                batch_g = train_g[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
+                batch_y = train_y.iloc[i_batch*self.batchsize:(i_batch+1)*self.batchsize].values
+                y_hat = self.model(batch_x, batch_t, batch_g, meta_ID_emb=None ,warm_or_cold='warm')
+                # calculate loss 
+                batch_y_tensor = torch.tensor(batch_y).view(-1,1).type(torch.FloatTensor)
+                batch_loss = self.log_loss(y_hat, batch_y_tensor)
+                # opt loss
+                self.optimizer.zero_grad()
+                batch_loss.backward()
+                self.optimizer.step()
+        # test eval  
         test_pred_test = self.model(self.test_x_test, self.test_t_test, self.test_g_test, meta_ID_emb=None, warm_or_cold='warm')
         test_y_test_tensor = torch.tensor(test_y_test).view(-1,1).type(torch.FloatTensor)
         logloss_base_cold = test_loss_test = self.log_loss(test_pred_test, test_y_test_tensor)
@@ -112,12 +113,13 @@ class Modeling:
                 batch_t_b = train_t_b[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
                 batch_g_b = train_g_b[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
                 batch_y_b = train_y_b[i_batch*self.batchsize:(i_batch+1)*self.batchsize]
-                # first term
-                y_hat = self.model(batch_x_a, batch_t_a, batch_g_a, meta_ID_emb=None, warm_or_cold='cold')
+                # first term 
+                y_hat_first = self.model(batch_x_a, batch_t_a, batch_g_a, meta_ID_emb=None, warm_or_cold='cold')
                 meta_ID_emb = self.model.meta_ID_emb
                 # calculate loss (1)
                 batch_y_a_tensor = torch.tensor(batch_y_a).view(-1,1).type(torch.FloatTensor)
-                batch_loss_a = self.log_loss(y_hat, batch_y_a_tensor)
+                batch_loss_a = self.log_loss(y_hat_first, batch_y_a_tensor)
+                #batch_loss_a.requires_grad_(True)
                 # second term
                 y_hat = self.model(batch_x_b, batch_t_b, batch_g_b, cold_loss_a=batch_loss_a, meta_ID_emb=meta_ID_emb, warm_or_cold='cold')
                 # calculate loss (2)
@@ -126,7 +128,7 @@ class Modeling:
                 # opt loss
                 ME_loss = batch_loss_a * self.alpha + batch_loss_b * (1-self.alpha)
                 self.optimizer.zero_grad()
-                batch_loss_b.backward()
+                ME_loss.backward()
                 self.optimizer.step()
             # on epoch end
             test_pred_test = self.model(self.test_x_test, self.test_t_test, self.test_g_test, warm_or_cold='cold')

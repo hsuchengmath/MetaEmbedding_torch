@@ -7,9 +7,22 @@ Codes for our SIGIR-2019 paper:
 This repo includes an example for training Meta-Embedding upon a deepFM model on the binarized MovieLens-1M dataset. The dataset is preprocessed and splitted already.
 
 Requirements: Python 3 and PyTorch. 
-Tensorflow Version : (https://github.com/Feiyang/MetaEmbedding)**
 
-### Bibtex
+**[Tensorflow Code (Paper Author Version)](https://github.com/Feiyang/MetaEmbedding)**
+
+
+# Performance (Tensorflow v.s. PyTorch)
+
+|| Tensorflow | PyTorch |
+|--|--|--|
+|Warm Model|   0.650700 | 0.610819|
+|Cold Model(Test_a)| 0.665154| 0.610174|
+|Cold Model(Test_b)| 0.671722| 0.614743|
+|Cold Model(Test_c)| 0.673590| 0.611912|
+
+
+
+# Bibtex
 
 ```
 @inproceedings{pan2019warm,
@@ -29,6 +42,9 @@ Tensorflow Version : (https://github.com/Feiyang/MetaEmbedding)**
  address = {New York, NY, USA},
 } 
 ```
+
+
+
 
 
 
